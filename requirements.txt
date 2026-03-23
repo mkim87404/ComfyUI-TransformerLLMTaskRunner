@@ -1,0 +1,4 @@
+accelerate	# works with whatever torch, CUDA, or transformers you already have installed, no pinning
+huggingface_hub	# harmless library for interfacing Hugging Face
+
+# If you have ComfyUI installed, torch + transformers will already be present.
