@@ -1,5 +1,5 @@
 # ComfyUI-TransformerLLMTaskRunner
----
+
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Node-blue)](https://github.com/comfyanonymous/ComfyUI)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -10,7 +10,7 @@ A clean, dependency-safe, and memory-conscious ComfyUI custom node that lets you
 **Useful for:** prompt enhancement, Booru image tag pruning, reasoning chains, JSON output, calculations, generic logic/thinking tasks offloading, etc.
 
 ## ✨ Features
----
+
 - Uses `transformers` + `torch` versions already installed on your ComfyUI instance (zero dependency conflicts or version pinning / downgrade), for maximum compatibility with evolving ComfyUI environments and other custom nodes.
 - Secure & Aggressive VRAM/RAM cleanup after every run (or optional “keep model loaded” mode for faster reruns)
 - Dynamic prompt formatting with up to 6 string variable injections + built-in chat-template support for modern instruct models
@@ -19,7 +19,7 @@ A clean, dependency-safe, and memory-conscious ComfyUI custom node that lets you
 - Full control: dtype, device_map, attn_implementation, max tokens, trust_remote_code
 
 ## 🛠️ Installation
----
+
 ```bash
 cd ComfyUI/custom_nodes
 git clone https://github.com/mkim87404/ComfyUI-TransformerLLMTaskRunner.git
@@ -29,7 +29,7 @@ pip install -r requirements.txt    # these are all harmless libraries that won't
 Then restart ComfyUI → double click anywhere in the workflow and search for **"Transformer LLM Task Runner"**
 
 ## 📥 Model Downloads
----
+
 **Auto download (recommended):** Just select a model from the node's model drop down menu or copy-paste a custom Hugging Face model ID into "custom_model_hf_id" and run. The node will auto-download the model on first run.
 
 **Manual download:**
@@ -39,7 +39,7 @@ hf download Qwen/Qwen2.5-7B-Instruct --local-dir "ComfyUI/models/LLM/Qwen2.5-7B-
 ```
 
 ## 🚀 Usage
----
+
 Add the node into your ComfyUI workflow and describe the task you want the LLM to run in any language supported by the LLM (with optional dynamic string inputs) and run. The LLM's output string can then be used by any downstream node in the workflow (e.g. prompts, string concatenate, boolean switch routing, Save Text etc.)
 
 **Example task (image2image edit prompt refinement):**
@@ -60,7 +60,7 @@ new instruction:
 This task will output a pruned description of the initial image containing only non-contradicting elements that you might want to preserve in the new image, and you could concatenate this output with {arg1} (your intended image changes) to form your final new image prompt.
 
 ## 📊 Node Parameters Table
----
+
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | **task** | String (multiline) | (Template) | Your task prompt with optional {argN} string placeholders |
@@ -75,7 +75,7 @@ This task will output a pruned description of the initial image containing only 
 | **argN** | String | (Optional) | Optional dynamic string input to replace {argN} in your task prompt |
 
 ## 🤖 Supported Models
----
+
 This node is designed for standard decoder-only transformer architectures. As long as a model meets the following criteria, it should work out-of-the-box:
 * **Model Format**: Must be in the Safetensors or PyTorch (.bin) format (GGUF, EXL2, or AWQ specialized formats are not supported by the current version of this node).
 * **Folder Structure**: The model folder must contain a standard config.json, tokenizer_config.json, and the weight files.
@@ -88,7 +88,7 @@ Avoid models labeled strictly as "GGUF" (used for llama.cpp) or "GPTQ" (unless y
     * If you find you need to make complex tweaks to this custom node to accommodate more advanced model architectures, I would generally recommend switching to their dedicated ComfyUI Custom Nodes such as [ComfyUI-Florence2](https://github.com/kijai/ComfyUI-Florence2), [ComfyUI-QwenVL](https://github.com/1038lab/ComfyUI-QwenVL), etc. but the tradeoff with these advanced nodes is that they might start introducing dependency conflicts to your ComfyUI environment as you install more advanced attention backends and/or model quantization or compression libraries, and some of these custom nodes may not be implementing memory clean up as thoroughly and gracefully as you might expect.
 
 ## 🧠 Memory Management Designs
----
+
 * When keep_model_loaded = False, model and tokenizer are explicitly unbound and garbage collected after every execution of the node. On next run, the node will correctly re-load the model if not found.
     * Avoided model.to("cpu") to unload the model from gpu as it conflicts with accelerate hooks used by device_map="auto" and can cause memory leaks / warnings. del model unbinding + py garbage collection is the safest solution for sharded, GPU, CPU, or sequential loads.
     * Avoided torch.cuda.synchronize() as it will block execution until all queued CUDA work is finished, adding unnecessary latency and compromises per-request throughput which is not strictly necessary for freeing memory and moving on.
@@ -97,5 +97,5 @@ Avoid models labeled strictly as "GGUF" (used for llama.cpp) or "GPTQ" (unless y
 * Best-effort memory clearance: Despite the above implementations, PyTorch’s caching allocator can still fragment over many runs, but this is generally harmless and fully reversed on ComfyUI Session termination. The only way to reliably reset everything on demand is simply restarting the ComfyUI Python process (one click in Manager or terminal), which is not a limitation of the node – it’s how PyTorch is designed for optimization as [documented](https://docs.pytorch.org/docs/stable/notes/cuda.html).
 
 ## 📜 License
----
+
 [**MIT License**](https://github.com/mkim87404/ComfyUI-TransformerLLMTaskRunner/blob/main/LICENSE) – feel free to use in any personal or commercial project, fork, or open issues/PRs – contributions and feedback all welcome!
