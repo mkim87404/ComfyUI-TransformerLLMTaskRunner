@@ -11,7 +11,7 @@ class AnyType(str):
     def __ne__(self, __value: object) -> bool:
         return False
 
-any = AnyType("*")
+anyType = AnyType("*")
 
 # Model root (standard folder used by many ComfyUI LLM nodes)
 MODEL_ROOT = os.path.join(folder_paths.models_dir, "LLM")
@@ -62,8 +62,8 @@ class TransformerLLMTaskRunner:
             "required": {
                 "task": ("STRING", {
                     "multiline": True,
-                    "default": "Write your LLM task here.\nOptionally use {arg0}, {arg1}... to inject dynamic string variables from other nodes.",
-                    "tooltip": "Enter full LLM prompt. Inject dynamic string variables with {arg0}, {arg1}..."
+                    "default": "Write your LLM task here.\nOptionally use {arg0}, {arg1}... placeholders to inject dynamic variables of any type from other nodes.",
+                    "tooltip": "Enter full LLM prompt. Inject dynamic variables with {arg0}, {arg1}..."
                 }),
                 "model": (MODEL_LIST, {
                     "default": MODEL_LIST[0],
@@ -100,12 +100,12 @@ class TransformerLLMTaskRunner:
                 }),
             },
             "optional": {
-                "arg0": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg0} in the task prompt, auto converted to string."}),
-                "arg1": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg1} in the task prompt, auto converted to string."}),
-                "arg2": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg2} in the task prompt, auto converted to string."}),
-                "arg3": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg3} in the task prompt, auto converted to string."}),
-                "arg4": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg4} in the task prompt, auto converted to string."}),
-                "arg5": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg5} in the task prompt, auto converted to string."}),
+                "arg0": (anyType, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg0} in the task prompt, auto converted to string."}),
+                "arg1": (anyType, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg1} in the task prompt, auto converted to string."}),
+                "arg2": (anyType, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg2} in the task prompt, auto converted to string."}),
+                "arg3": (anyType, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg3} in the task prompt, auto converted to string."}),
+                "arg4": (anyType, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg4} in the task prompt, auto converted to string."}),
+                "arg5": (anyType, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg5} in the task prompt, auto converted to string."}),
             }
         }
 
