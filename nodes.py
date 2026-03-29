@@ -2,15 +2,23 @@ import os
 import gc
 import folder_paths
 import torch
+import comfy.model_management as model_management
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from huggingface_hub import snapshot_download
+
+# To accept any type for the optional dynamic prompt formatting inputs (required trick for ComfyUI graph compatibility, may not work with reroutes)
+class AnyType(str):
+    def __ne__(self, __value: object) -> bool:
+        return False
+
+any = AnyType("*")
 
 # Model root (standard folder used by many ComfyUI LLM nodes)
 MODEL_ROOT = os.path.join(folder_paths.models_dir, "LLM")
 os.makedirs(MODEL_ROOT, exist_ok=True)
 folder_paths.add_model_folder_path("LLM", MODEL_ROOT)
 
-# Preset models + automatic discovery of any locally downloaded model folders
+# Preset models + grows with automatic discovery of any locally downloaded model folders
 MODEL_LIST = [
     "Qwen/Qwen2.5-7B-Instruct",
     "Qwen/Qwen2.5-Coder-7B-Instruct",
@@ -37,9 +45,9 @@ for folder in [f for f in os.listdir(MODEL_ROOT) if os.path.isdir(os.path.join(M
 class TransformerLLMTaskRunner:
     """
     A dependency-safe, memory-conscious node for running basic transformer LLMs inside ComfyUI.
-    • Uses only torch + transformers (already present in most ComfyUI installs), without pinning or downgrading currently installed versions.
-    • Aggressive VRAM/RAM cleanup after each run.
-    • Supports prompt formatting with up to 6 dynamic string inputs.
+    • Uses only torch + transformers (already present in ComfyUI installs), without pinning or downgrading currently installed versions.
+    • Robust & device-agnostic VRAM/RAM cleanup after each run with option to keep model loaded.
+    • Supports dynamic prompt formatting with up to 6 dynamic inputs of any type, auto converted to string.
     • Automatic model download, custom model id support, auto attention fallbacks, chat template support.
     """
 
@@ -84,20 +92,20 @@ class TransformerLLMTaskRunner:
                 }),
                 "trust_remote_code": ("BOOLEAN", {
                     "default": False,
-                    "tooltip": "Only enable for models that explicitly require it in their HF card (most do not)."
+                    "tooltip": "Only enable for models that explicitly require it in their HF card."
                 }),
                 "keep_model_loaded": ("BOOLEAN", {
                     "default": False,
-                    "tooltip": "Set True for faster re-runs (model stays in memory + still clears cache), and False for full model unload + max VRAM recovery after each node execution."
+                    "tooltip": "Set True for faster re-runs (model stays in memory + still clears cache), and False for full model unload + max VRAM/RAM recovery after each node execution."
                 }),
             },
             "optional": {
-                "arg0": ("STRING", {"forceInput": True, "tooltip": "Optional dynamic string to replace {arg0} in the task prompt"}),
-                "arg1": ("STRING", {"forceInput": True, "tooltip": "Optional dynamic string to replace {arg1} in the task prompt"}),
-                "arg2": ("STRING", {"forceInput": True, "tooltip": "Optional dynamic string to replace {arg2} in the task prompt"}),
-                "arg3": ("STRING", {"forceInput": True, "tooltip": "Optional dynamic string to replace {arg3} in the task prompt"}),
-                "arg4": ("STRING", {"forceInput": True, "tooltip": "Optional dynamic string to replace {arg4} in the task prompt"}),
-                "arg5": ("STRING", {"forceInput": True, "tooltip": "Optional dynamic string to replace {arg5} in the task prompt"}),
+                "arg0": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg0} in the task prompt, auto converted to string."}),
+                "arg1": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg1} in the task prompt, auto converted to string."}),
+                "arg2": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg2} in the task prompt, auto converted to string."}),
+                "arg3": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg3} in the task prompt, auto converted to string."}),
+                "arg4": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg4} in the task prompt, auto converted to string."}),
+                "arg5": (any, {"forceInput": True, "tooltip": "Optional dynamic input to replace {arg5} in the task prompt, auto converted to string."}),
             }
         }
 
@@ -105,7 +113,7 @@ class TransformerLLMTaskRunner:
     OUTPUT_TOOLTIPS = ("The LLM generated text output, with the input prompt removed.",)
     FUNCTION = "run_task"
     CATEGORY = "LLM/Transformer"
-    DESCRIPTION = "Offload any text tasks to a local transformer LLM. e.g. reasoning, calculation, prompt enhancement, image tag pruning, JSON manipulation, generic logic tasks, etc."
+    DESCRIPTION = "Offload any task to a local transformer LLM. e.g. prompt enhancement, reasoning, translation, calculation, text summarization, JSON manipulation, etc."
 
     def load_model(self, model_id: str, dtype: str, trust_remote_code: bool, attn_impl: str, device_map: str):
         if self.model is not None:
@@ -135,18 +143,18 @@ class TransformerLLMTaskRunner:
                 self.device = "cpu"
         except RuntimeError as e:
             if "out of memory" in str(e).lower():
-                print("OOM: Falling back to CPU + float32")
+                print(" - OOM: Falling back to CPU + float32")
                 kwargs.update({"device_map": "cpu", "torch_dtype": torch.float32})
                 self.model = AutoModelForCausalLM.from_pretrained(model_path, **kwargs)
                 self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=trust_remote_code)
                 self.device = "cpu"
             elif attn_impl != "sdpa":
-                print("Attn fallback → sdpa")
+                print(" - Attn fallback → sdpa")
                 kwargs["attn_implementation"] = "sdpa"
                 self.model = AutoModelForCausalLM.from_pretrained(model_path, **kwargs)
                 self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=trust_remote_code)
             else:
-                print("Attn fallback → eager")
+                print(" - Attn fallback → eager")
                 kwargs["attn_implementation"] = "eager"
                 self.model = AutoModelForCausalLM.from_pretrained(model_path, **kwargs)
                 self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=trust_remote_code)
@@ -154,6 +162,16 @@ class TransformerLLMTaskRunner:
     def run_task(self, task, model, custom_model_hf_id, dtype, attn_implementation,
                  device_map, max_new_tokens, trust_remote_code, keep_model_loaded,
                  arg0="", arg1="", arg2="", arg3="", arg4="", arg5=""):
+
+        # AnyType → string conversion for the optional dynamic prompt formatting inputs
+        arg0 = "" if arg0 is None else str(arg0)
+        arg1 = "" if arg1 is None else str(arg1)
+        arg2 = "" if arg2 is None else str(arg2)
+        arg3 = "" if arg3 is None else str(arg3)
+        arg4 = "" if arg4 is None else str(arg4)
+        arg5 = "" if arg5 is None else str(arg5)
+
+        print("### TransformerLLMTaskRunner • Loading LLM ###")
         try:
             model_id = custom_model_hf_id.strip() or model
             self.load_model(model_id, dtype, trust_remote_code, attn_implementation, device_map)
@@ -178,25 +196,48 @@ class TransformerLLMTaskRunner:
                 result = self.tokenizer.decode(outputs[0][input_len:], skip_special_tokens=True).strip()
 
             return (result,)
-
+        except Exception as e:
+            print(f" - Error during LLM load/run:\n{e}")
+            return ("",)
         finally:
-            # === Memory safety cleanup ===
-            print("# TransformerLLMTaskRunner • Full cleanup #")
-            if not keep_model_loaded:
-                # Deliberate design choice:
-                # 1. do not call self.model.to("cpu") to unload the model from gpu because it conflicts with accelerate/device_map="auto" hooks and can leak memory or raise warnings.
-                # Instead, simply deleting the Python reference and invoking py garbage collection is the safest, most reliable method that works for sharded models, pure GPU, pure CPU, or sequential – no exceptions.
-                # 2. do not call torch.cuda.synchronize() as it will block execution until all queued CUDA work is finished, adding unnecessary latency and compromises per-request throughput which is not strictly necessary for freeing memory and moving on.
-                if self.model is not None:
-                    del self.model
-                    self.model = None
-                if self.tokenizer is not None:
-                    del self.tokenizer
-                    self.tokenizer = None
+            print("### TransformerLLMTaskRunner • Full memory cleanup ###")
+            try:
+                # Unload the model
+                if not keep_model_loaded:
+                    # Deliberate design choice:
+                    # 1. do not call self.model.to("cpu") to unload the model from gpu because it conflicts with accelerate/device_map="auto" hooks and can leak memory or raise warnings.
+                    # Instead, simply deleting the Python reference and invoking py garbage collection is the safest, most reliable method that works for sharded models, pure GPU, pure CPU, or sequential – no exceptions.
+                    # 2. do not overuse torch.cuda.synchronize() as it will block execution until all queued CUDA work is finished, adding unnecessary latency and compromises per-request throughput which is not strictly necessary for freeing memory and moving on.
+                    if self.model is not None:
+                        del self.model
+                        self.model = None
+                    if self.tokenizer is not None:
+                        del self.tokenizer
+                        self.tokenizer = None
 
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                torch.cuda.reset_peak_memory_stats()    # Optional but keeps stats clean
-            gc.collect()    # Force Python + torch garbage collection (critical for CPU RAM too).
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()    # Double empty_cache is a well-known best practice pattern to catch any lingering tensors after GC
+                # 1st Pass - Clearing VRAM cache
+                # - CUDA Devices: torch.cuda.synchronize() + torch.cuda.empty_cache() + torch.cuda.ipc_collect()
+                # - Non-CUDA Devices (MPS/XPU/NPU/MLU): empty_cache()
+                model_management.soft_empty_cache(True)
+                
+                # Force Python + torch garbage collection (Clearing CPU RAM)
+                gc.collect()
+
+                # 2nd Pass - Double empty_cache() is a well-known best practice pattern to catch any lingering tensors after GC
+                if torch.cuda.is_available():
+                    # Skipping torch.cuda.synchronize() on the 2nd pass
+                    torch.cuda.empty_cache()
+                    torch.cuda.ipc_collect()
+                    torch.cuda.reset_peak_memory_stats()    # Optional but keeps CUDA stats clean
+                elif hasattr(torch, 'mps') and torch.mps.is_available():
+                    torch.mps.empty_cache()
+                elif hasattr(torch, 'xpu') and torch.xpu.is_available():
+                    torch.xpu.empty_cache()
+                elif hasattr(torch, 'npu') and torch.npu.is_available():
+                    torch.npu.empty_cache()
+                elif hasattr(torch, 'mlu') and torch.mlu.is_available():
+                    torch.mlu.empty_cache()
+                
+                print(" - VRAM/RAM cleanup complete.")
+            except Exception as cleanup_err:
+                print(f" - Error during memory cleanup:\n{cleanup_err}")
