@@ -1,9 +1,13 @@
 # ComfyUI-TransformerLLMTaskRunner
 
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Node-blue)](https://github.com/comfyanonymous/ComfyUI)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-orange)](https://pytorch.org/)
+[![Transformers](https://img.shields.io/badge/🤗-Transformers-yellow)](https://huggingface.co/docs/transformers)
+[![Hugging Face](https://img.shields.io/badge/🤗-Hugging_Face-yellow)](https://huggingface.co/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A dependency-safe and memory-conscious ComfyUI custom node that runs basic **transformer LLMs** directly inside ComfyUI workflows, with robust and device-agnostic VRAM/RAM cleanup options post-run. Supports dynamic LLM prompt formatting with up to 6 input variables of any type, auto converted to string.
+A dependency-safe and memory-conscious ComfyUI custom node that runs basic **Transformer LLMs** directly inside ComfyUI workflows, with robust and device-agnostic VRAM/RAM cleanup options post-run. Supports dynamic LLM prompt formatting with up to 6 input variables of any type, auto converted to string.
 
 [![ComfyUI Node Screenshot](https://github.com/user-attachments/assets/2e5bbbeb-3f11-4dec-a599-0e1518423b0f)](https://github.com/user-attachments/assets/2e5bbbeb-3f11-4dec-a599-0e1518423b0f)
 
@@ -11,7 +15,7 @@ A dependency-safe and memory-conscious ComfyUI custom node that runs basic **tra
 
 ## ✨ Features
 
-- Uses `transformers` + `torch` versions already installed on your ComfyUI instance (zero dependency conflicts or version pinning / downgrade), for maximum compatibility with evolving ComfyUI environments and other custom nodes.
+- Uses `transformers` + `torch` versions already installed on your ComfyUI instance (zero dependency conflicts or version pinning / downgrades), for maximum compatibility with evolving ComfyUI environments and other custom nodes.
 - Secure & device-agnostic VRAM/RAM cleanup after every run (with optional “keep model loaded” mode for faster re-runs)
 - Dynamic prompt formatting with up to 6 input variable injections (auto converted to string) + built-in chat-template support for modern instruct models
 - Automatic Hugging Face model downloads + Custom model support
